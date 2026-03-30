@@ -7,35 +7,43 @@ import {
     DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
-export default function UploadMenu() {
+
+type UploadMenuProps = {
+    onFilesAccepted?: (files: File[]) => void
+}
+
+export default function UploadMenu({ onFilesAccepted }: UploadMenuProps) {
     const [open, setOpen] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "application/pdf"]
 
-    // handle file select
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files
-        console.log("selected files:", files);
+        if (!files?.length) return
 
-        if (!files) return
-        Array.from(files).forEach(file => {
+        const accepted: File[] = []
+        Array.from(files).forEach((file) => {
             if (!allowedTypes.includes(file.type)) {
-                // show thông báo lỗi
-                console.log("vo6 day69");
-
                 toast.error(`File type not supported.`, { position: "top-right" })
             } else {
-                console.log("Selected file:", file)
-                // TODO: handle upload logic
+                accepted.push(file)
             }
         })
+        if (accepted.length) onFilesAccepted?.(accepted)
         e.target.value = ""
     }
 
     return (
         <>
-            <input type="file" accept=".png,.jpg,.jpeg,.pdf" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
+            <input
+                type="file"
+                accept=".png,.jpg,.jpeg,.pdf"
+                multiple
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileSelect}
+            />
             {/* Dropdown menu */}
             <DropdownMenu open={open} onOpenChange={setOpen}>
                 <DropdownMenuTrigger asChild>
@@ -47,7 +55,6 @@ export default function UploadMenu() {
                 <DropdownMenuContent align="start" className="flex flex-col gap-1 p-2 w-[350px] max-h-[500px] overflow-hidden rounded-[12px] border border-neutral-300 shadow-[0_2px_4px_rgba(31,33,36,0.12)] bg-white">
                     <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded-md hover:bg-gray-100 focus:outline-none transition-colors duration-200 cursor-pointer">
                         <Upload className="mr-2 h-4 w-4 " /> Upload files
-
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
