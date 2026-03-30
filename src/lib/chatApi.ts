@@ -1,24 +1,23 @@
 import { api, ApiError, resolveApiUrl } from "@/lib/api"
+import type { ApiResponse, Chat, Message, Pagination } from "@/types/chat"
+import { getOrCreateClientId } from "@/utils/helper"
 
 export type ChatPromptBody = {
   message: string
 }
 
-/** POST JSON một lần (không stream). */
-export function sendChatPrompt(body: ChatPromptBody) {
-  return api<unknown>("/chat", { method: "POST", body })
+/** Get or create chat */
+export const getOrCreateChat = async () => {
+  const clientId = getOrCreateClientId()
+  return api<ApiResponse<Chat>>(`chat/${clientId}`)
 }
 
-export function extractAssistantText(data: unknown): string | null {
-  if (data == null) return null
-  if (typeof data === "string") return data
-  if (typeof data !== "object") return null
-  const o = data as Record<string, unknown>
-  if (typeof o.reply === "string") return o.reply
-  if (typeof o.message === "string") return o.message
-  if (typeof o.content === "string") return o.content
-  if (typeof o.data === "string") return o.data
-  return null
+//** Get messages trong chat */
+export const getMessages = async (chatId: number) => {
+  const res = await api<ApiResponse<Pagination<Message>>>(
+    `/chat/${chatId}/messages?page=1&limit=999`
+  )
+  return res.data
 }
 
 export type StreamChatHandlers = {
@@ -111,21 +110,23 @@ async function readErrorBody(res: Response): Promise<unknown> {
 
 /**
  * Đọc phản hồi streaming (SSE `text/event-stream` hoặc text/plain từng chunk).
- * Body gửi `{ message, stream: true }` — chỉnh path/body theo backend thực tế.
+ * Body gửi `{ message, stream: true }`.
  */
 export async function streamChatPrompt(
+  chatId: number,
   body: ChatPromptBody,
   handlers: StreamChatHandlers
 ): Promise<void> {
-  const url = resolveApiUrl("/chat")
+  const url = resolveApiUrl(`/chat/${chatId}/messages`)
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Accept: "text/event-stream, application/json",
     },
     body: JSON.stringify({ ...body, stream: true }),
   })
+  console.log("res============", res);
+
 
   if (!res.ok) {
     const data = await readErrorBody(res)
@@ -140,6 +141,7 @@ export async function streamChatPrompt(
   if (!reader) {
     throw new Error("Response has no body")
   }
+
 
   const ct = res.headers.get("content-type") ?? ""
   if (ct.includes("text/event-stream")) {

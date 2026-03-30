@@ -1,16 +1,12 @@
 import { useEffect, useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import type { Message } from "@/types/chat"
 
-export type ChatMessage = {
-  id: string
-  role: "user" | "assistant"
-  content: string
-}
-
+export type ChatMessage = Message
 type ChatMessagesProps = {
   messages: ChatMessage[]
- 
+
   isStreaming?: boolean
 }
 
@@ -27,7 +23,7 @@ export default function ChatMessages({
   if (messages.length === 0) {
     return (
       <div className="flex flex-1 min-h-0 items-center justify-center text-sm text-neutral-400">
-        
+
       </div>
     )
   }
@@ -46,7 +42,7 @@ export default function ChatMessages({
             )}
           >
             {m.content}
-            {m.role === "assistant" &&
+            {m.role === "ai" &&
               isStreaming &&
               i === messages.length - 1 && (
                 <span

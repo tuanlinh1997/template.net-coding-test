@@ -59,13 +59,7 @@ function getErrorMessage(status: number, body: unknown, statusText: string): str
   return statusText || `Request failed (${status})`
 }
 
-/**
- * Gọi API dùng chung: gắn `VITE_API_URL`, mặc định JSON body/parse, hỗ trợ FormData.
- *
- * @example
- * const user = await api<User>("/users/me")
- * await api("/items", { method: "POST", body: { name: "a" } })
- */
+
 export async function api<T = unknown>(
   path: string,
   options: ApiRequestOptions = {}
