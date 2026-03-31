@@ -115,7 +115,6 @@ export default function MainLayout({ chatId }: Props) {
 
         toast.error(msg, { position: "top-right" })
 
-        // Xóa message AI placeholder nếu chưa kịp nhận nội dung
         setMessages((prev) =>
           prev.filter(
             (m) =>

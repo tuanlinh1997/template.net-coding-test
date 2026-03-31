@@ -1,4 +1,3 @@
-// useChat.ts
 import { useEffect, useState } from 'react'
 import { getOrCreateChat } from './chatApi'
 import { getOrCreateClientId } from '../utils/helper'

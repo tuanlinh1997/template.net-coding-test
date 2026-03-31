@@ -1,5 +1,4 @@
-// src/components/layout/Sidebar.tsx
-import { Home, FileText, Image, Video, Layout, Presentation, Settings, Ellipsis, LayoutTemplate, FolderOpenDotIcon, Volleyball, LogIn, Crown } from "lucide-react"
+import { Home, FileText, Image, Video, Layout, Presentation, Ellipsis, LayoutTemplate, FolderOpenDotIcon, Volleyball, LogIn, Crown } from "lucide-react"
 
 
 const items = [

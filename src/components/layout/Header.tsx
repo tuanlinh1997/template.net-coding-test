@@ -1,4 +1,3 @@
-// src/components/layout/Header.tsx
 import { Search } from "lucide-react"
 
 export default function Header() {

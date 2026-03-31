@@ -44,7 +44,6 @@ export default function UploadMenu({ onFilesAccepted }: UploadMenuProps) {
                 className="hidden"
                 onChange={handleFileSelect}
             />
-            {/* Dropdown menu */}
             <DropdownMenu open={open} onOpenChange={setOpen}>
                 <DropdownMenuTrigger asChild>
                     <button className="rounded-full p-3 text-neutral-900 transition-all duration-200 hover:bg-gray-200  focus:outline-none">

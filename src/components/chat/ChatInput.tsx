@@ -1,4 +1,3 @@
-// src/components/chat/ChatInput.tsx
 import {
   useCallback,
   useEffect,
@@ -91,8 +90,8 @@ export default function ChatInput({
 
     try {
       await onSubmitPrompt({ text, files })
-    } catch (e) {
-      console.error(e)
+    } catch {
+      return
     }
   }, [prompt, attachments, isSending, onSubmitPrompt])
 
