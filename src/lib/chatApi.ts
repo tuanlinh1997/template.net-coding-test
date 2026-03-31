@@ -25,6 +25,109 @@ export type StreamChatHandlers = {
   onDone?: () => void
 }
 
+export function extractAssistantTextFromResponse(data: unknown): string | null {
+  if (data == null) return null
+
+  // Nếu backend bọc theo ApiResponse -> lấy `data` bên trong
+  const payload =
+    typeof data === "object" && "data" in data
+      ? (data as { data: unknown }).data
+      : data
+
+  if (typeof payload === "string") return payload
+
+  if (payload && typeof payload === "object") {
+    const o = payload as Record<string, unknown>
+    const direct =
+      (typeof o.content === "string" && o.content) ||
+      (typeof o.reply === "string" && o.reply) ||
+      (typeof o.message === "string" && o.message) ||
+      (typeof o.text === "string" && o.text)
+    if (direct) return direct
+    const choices = o.choices
+    if (Array.isArray(choices) && choices.length > 0) {
+      const c0 = choices[0] as Record<string, unknown>
+      const msgAny = c0.message as unknown
+      const msgContent =
+        msgAny && typeof msgAny === "object" && "content" in msgAny
+          ? typeof (msgAny as { content?: unknown }).content === "string"
+            ? (msgAny as { content: string }).content
+            : null
+          : null
+      if (msgContent) return msgContent
+
+      const deltaAny = c0.delta as unknown
+      const deltaContent =
+        deltaAny && typeof deltaAny === "object" && "content" in deltaAny
+          ? typeof (deltaAny as { content?: unknown }).content === "string"
+            ? (deltaAny as { content: string }).content
+            : null
+          : null
+      if (deltaContent) return deltaContent
+    }
+
+    // Nếu trả về list messages: { items: [...] } / { messages: [...] }
+    const list = (Array.isArray(o.items) ? o.items : Array.isArray(o.messages) ? o.messages : null) as
+      | unknown[]
+      | null
+    if (list) {
+      const aiItem = list.find((it) => {
+        if (!it || typeof it !== "object") return false
+        const m = it as Record<string, unknown>
+        const sender = m.sender
+        const role = m.role
+        return (
+          sender === "ai" ||
+          role === "ai" ||
+          sender === "assistant" ||
+          role === "assistant"
+        )
+      })
+      if (aiItem && typeof aiItem === "object") {
+        const m = aiItem as Record<string, unknown>
+        const content = m.content
+        if (typeof content === "string") return content
+        const message = m.message
+        if (typeof message === "string") return message
+      }
+    }
+  }
+
+  return null
+}
+
+/**
+ * REST call (không streaming): gửi prompt và nhận response 1 lần.
+ * 
+ */
+export async function sendChatPrompt(
+  chatId: number,
+  payload: ChatPromptBody & { files?: File[] }
+): Promise<unknown> {
+  const { message, files = [] } = payload
+
+  // Nếu có file -> gửi FormData để upload ảnh/file cùng prompt.
+  if (files.length > 0) {
+    const form = new FormData()
+    form.append("message", message)
+    form.append("stream", "false")
+    files.forEach((file) => {
+      form.append("files", file)
+    })
+
+    return api<unknown>(`/chat/${chatId}/messages`, {
+      method: "POST",
+      body: form,
+    })
+  }
+
+  // Không có file -> giữ cách gửi JSON như cũ.
+  return api<unknown>(`/chat/${chatId}/messages`, {
+    method: "POST",
+    body: { message, stream: false },
+  })
+}
+
 function parseJsonChunk(s: string): string | null {
   if (!s) return null
   try {
@@ -118,14 +221,30 @@ export async function streamChatPrompt(
   handlers: StreamChatHandlers
 ): Promise<void> {
   const url = resolveApiUrl(`/chat/${chatId}/messages`)
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ ...body, stream: true }),
+  console.log("streamChatPrompt fetch start", { chatId, url })
+
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      mode: "cors",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream, application/json",
+        "Cache-Control": "no-cache",
+      },
+      body: JSON.stringify({ ...body, stream: true }),
+    })
+  } catch (err) {
+    console.error("streamChatPrompt fetch failed", { chatId, url, err })
+    throw err
+  }
+
+  console.log("streamChatPrompt res============", {
+    ok: res.ok,
+    status: res.status,
+    contentType: res.headers.get("content-type"),
   })
-  console.log("res============", res);
 
 
   if (!res.ok) {

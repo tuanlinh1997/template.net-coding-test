@@ -16,21 +16,22 @@ export default function UploadMenu({ onFilesAccepted }: UploadMenuProps) {
     const [open, setOpen] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "application/pdf"]
+    const allowedTypes = ["image/png", "image/jpeg", "image/jpg"]
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files
         if (!files?.length) return
 
-        const accepted: File[] = []
-        Array.from(files).forEach((file) => {
-            if (!allowedTypes.includes(file.type)) {
-                toast.error(`File type not supported.`, { position: "top-right" })
-            } else {
-                accepted.push(file)
-            }
-        })
-        if (accepted.length) onFilesAccepted?.(accepted)
+        const file = files[0]
+        if (!file) return
+
+        if (!allowedTypes.includes(file.type)) {
+            toast.error("Chỉ hỗ trợ ảnh PNG/JPG/JPEG.", { position: "top-right" })
+            e.target.value = ""
+            return
+        }
+
+        onFilesAccepted?.([file])
         e.target.value = ""
     }
 
@@ -38,8 +39,7 @@ export default function UploadMenu({ onFilesAccepted }: UploadMenuProps) {
         <>
             <input
                 type="file"
-                accept=".png,.jpg,.jpeg,.pdf"
-                multiple
+                accept=".png,.jpg,.jpeg"
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleFileSelect}

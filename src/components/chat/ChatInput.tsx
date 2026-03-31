@@ -14,7 +14,7 @@ import UploadMenu from "./UploadMenu"
 import { cn } from "@/lib/utils"
 
 type ChatInputProps = {
-  onSubmitPrompt?: (text: string) => void | Promise<void>
+  onSubmitPrompt?: (payload: { text: string; files: File[] }) => void | Promise<void>
   isSending?: boolean
 }
 
@@ -45,20 +45,27 @@ export default function ChatInput({
   }, [])
 
   const handleFilesAccepted = useCallback((files: File[]) => {
-    setAttachments((prev) => [
-      ...prev,
-      ...files.map((file) => ({
+    const file = files[0]
+    if (!file) return
+
+    setAttachments((prev) => {
+      prev.forEach((a) => {
+        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+      })
+      return [{
         id: crypto.randomUUID(),
         file,
         previewUrl: file.type.startsWith("image/")
           ? URL.createObjectURL(file)
           : null,
-      })),
-    ])
+      }]
+    })
   }, [])
 
   const hasPrompt = prompt.trim().length > 0
-  const canUsePrimaryStyle = hasPrompt && !!onSubmitPrompt
+  const hasAttachments = attachments.length > 0
+  const canSubmit = (hasPrompt || hasAttachments) && !!onSubmitPrompt
+  const canUsePrimaryStyle = canSubmit
 
   const removeAttachment = useCallback((id: string) => {
     setAttachments((prev) => {
@@ -70,14 +77,24 @@ export default function ChatInput({
 
   const submitPrompt = useCallback(async () => {
     const text = prompt.trim()
-    if (!text || isSending || !onSubmitPrompt) return
+    if ((!text && attachments.length === 0) || isSending || !onSubmitPrompt) return
+
+    const files = attachments.map((a) => a.file)
+
     setPrompt("")
+    setAttachments((prev) => {
+      prev.forEach((a) => {
+        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+      })
+      return []
+    })
+
     try {
-      await onSubmitPrompt(text)
+      await onSubmitPrompt({ text, files })
     } catch (e) {
       console.error(e)
     }
-  }, [prompt, isSending, onSubmitPrompt])
+  }, [prompt, attachments, isSending, onSubmitPrompt])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -151,7 +168,7 @@ export default function ChatInput({
                 ? "bg-[#6366f1] text-white hover:bg-[#4f46e5]"
                 : "cursor-not-allowed bg-neutral-200 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-500"
             )}
-            disabled={!hasPrompt || isSending || !onSubmitPrompt}
+            disabled={!canSubmit || isSending || !onSubmitPrompt}
             onClick={() => void submitPrompt()}
           >
             {isSending ? (

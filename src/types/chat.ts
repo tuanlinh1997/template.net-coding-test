@@ -15,8 +15,11 @@ export interface Chat {
 export interface Message {
   id: number | string
   content: string
-  role: 'user' | 'ai'
+  sender: 'user' | 'ai'
   created_at: string
+  type?: 'text' | 'file'
+  mimeType?: string
+  chatId?: number
 }
 
 export interface Pagination<T> {

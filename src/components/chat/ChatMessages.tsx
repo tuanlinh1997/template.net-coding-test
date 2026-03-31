@@ -10,6 +10,15 @@ type ChatMessagesProps = {
   isStreaming?: boolean
 }
 
+function isImageFileContent(content: string, mimeType?: string): boolean {
+  if (mimeType?.startsWith("image/")) return true
+  return (
+    content.startsWith("data:image/") ||
+    content.startsWith("blob:") ||
+    /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(content)
+  )
+}
+
 export default function ChatMessages({
   messages,
   isStreaming = false,
@@ -35,15 +44,42 @@ export default function ChatMessages({
           <div
             key={m.id}
             className={cn(
-              "text-[15px] leading-relaxed whitespace-pre-wrap break-words",
-              m.role === "user"
-                ? "ml-auto max-w-[min(100%,42rem)] text-right text-neutral-900 bg-indigo-100 rounded-md px-1"
-                : "mr-auto max-w-[min(100%,42rem)] text-neutral-800"
+              "text-[15px] leading-relaxed break-words",
+              m.sender === "user"
+                ? "ml-auto max-w-[min(100%,42rem)] text-right text-neutral-900 bg-indigo-100 rounded-xl px-1"
+                : "mr-auto max-w-[min(100%,42rem)] text-left text-neutral-800 bg-indigo-100 rounded-xl px-1"
             )}
           >
-            {m.content}
-            {m.role === "ai" &&
+            {m.type === "file" ? (
+              isImageFileContent(m.content, m.mimeType) ? (
+                <img
+                  src={m.content}
+                  alt="uploaded file"
+                  className="max-h-64 max-w-[18rem] rounded-lg object-cover"
+                />
+              ) : (
+                <a
+                  href={m.content}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Open file
+                </a>
+              )
+            ) : m.sender === "ai" && isStreaming && !m.content ? (
+              <span className="inline-flex items-center gap-1 text-neutral-500">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.2s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.1s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400" />
+              </span>
+            ) : (
+              <span className="whitespace-pre-wrap">{m.content}</span>
+            )}
+            {m.type !== "file" &&
+              m.sender === "ai" &&
               isStreaming &&
+              !!m.content &&
               i === messages.length - 1 && (
                 <span
                   className="ml-0.5 inline-block h-[1.05em] w-0.5 animate-pulse bg-neutral-500 align-[-0.15em]"

@@ -6,7 +6,11 @@ import ChatInput from "../chat/ChatInput"
 import ChatMessages from "../chat/ChatMessages"
 import { Toaster } from "../ui/sonner"
 import { ApiError } from "@/lib/api"
-import { getMessages, streamChatPrompt } from "@/lib/chatApi"
+import {
+  extractAssistantTextFromResponse,
+  getMessages,
+  sendChatPrompt,
+} from "@/lib/chatApi"
 import type { Message } from "@/types/chat"
 
 
@@ -24,7 +28,14 @@ export default function MainLayout({ chatId }: Props) {
     const fetchMessages = async () => {
       try {
         const res = await getMessages(chatId)
-        setMessages([...res.items].reverse())
+        const maybeItems = (res as unknown as { items?: Message[] }).items
+        const items = Array.isArray(maybeItems)
+          ? maybeItems
+          : Array.isArray(res)
+            ? (res as unknown as Message[])
+            : []
+
+        setMessages([...items].reverse())
       } catch (err) {
         console.error("Load messages error:", err)
       }
@@ -34,43 +45,67 @@ export default function MainLayout({ chatId }: Props) {
   }, [chatId])
 
   const handleSubmitPrompt = useCallback(
-    async (text: string) => {
-      if (!chatId) return
+    async ({ text, files }: { text: string; files: File[] }) => {
+      if (!chatId) {
+        toast.error("Chat chưa sẵn sàng (chatId chưa load). Vui lòng thử lại.", {
+          position: "top-right",
+        })
+        return
+      }
 
-      const userId = crypto.randomUUID()
+      const trimmedText = text.trim()
       const assistantId = crypto.randomUUID()
+      const shouldCallApi = trimmedText.length > 0 || files.length > 0
 
+      const localFileMessages: Message[] = files.map((file) => ({
+        id: crypto.randomUUID(),
+        sender: "user",
+        type: "file",
+        content: URL.createObjectURL(file),
+        mimeType: file.type,
+        created_at: new Date().toISOString(),
+      }))
 
       setMessages((prev) => [
         ...prev,
-        { id: userId, role: "user", content: text, created_at: new Date().toISOString() },
-        { id: assistantId, role: "ai", content: "", created_at: new Date().toISOString() },
+        ...localFileMessages,
+        ...(trimmedText
+          ? [{
+              id: crypto.randomUUID(),
+              sender: "user" as const,
+              type: "text" as const,
+              content: trimmedText,
+              created_at: new Date().toISOString(),
+            }]
+          : []),
+        ...(shouldCallApi
+          ? [{
+              id: assistantId,
+              sender: "ai" as const,
+              type: "text" as const,
+              content: "",
+              created_at: new Date().toISOString(),
+            }]
+          : []),
       ])
+
+      if (!shouldCallApi) return
 
       setIsSending(true)
 
       try {
-        await streamChatPrompt(
-          chatId,
-          { message: text },
-          {
-            onChunk: (delta) => {
-              setMessages((prev) => {
-                const last = prev[prev.length - 1]
+        const data = await sendChatPrompt(chatId, {
+          message: trimmedText,
+          files,
+        })
+        const reply = extractAssistantTextFromResponse(data)
 
-                // chỉ update message cuối (AI)
-                if (!last || last.id !== assistantId) return prev
+        if (!reply) {
+          throw new Error("Không nhận được phản hồi từ server.")
+        }
 
-                const updated = [...prev]
-                updated[updated.length - 1] = {
-                  ...last,
-                  content: last.content + delta,
-                }
-
-                return updated
-              })
-            },
-          }
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: reply } : m))
         )
       } catch (e) {
         const msg =
@@ -80,21 +115,17 @@ export default function MainLayout({ chatId }: Props) {
 
         toast.error(msg, { position: "top-right" })
 
-        // ❌ chỉ remove AI message nếu chưa có content
-        setMessages((prev) => {
-          const last = prev[prev.length - 1]
-
-          if (
-            last &&
-            last.id === assistantId &&
-            last.role === "ai" &&
-            last.content === ""
-          ) {
-            return prev.slice(0, -1)
-          }
-
-          return prev
-        })
+        // Xóa message AI placeholder nếu chưa kịp nhận nội dung
+        setMessages((prev) =>
+          prev.filter(
+            (m) =>
+              !(
+                m.id === assistantId &&
+                m.sender === "ai" &&
+                m.content === ""
+              )
+          )
+        )
 
         throw e
       } finally {
